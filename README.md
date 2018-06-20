@@ -2,7 +2,7 @@
 A Kotlin script that nukes all build caches from Gradle/Android projects.
 Useful when Gradle or the IDE let you down 💔
 
-![deep-clean in action](https://user-images.githubusercontent.com/153802/41052669-bc212d4c-69b9-11e8-8bf4-12eea6dbb7f2.png)
+![deep-clean in action](https://user-images.githubusercontent.com/153802/41173653-ab0ae36c-6b4f-11e8-8f98-8dba4340add7.png)
 
 🎩 h/t to [@Takhion](https://github.com/Takhion) for the original idea, and to
 [@holgerbrandl](https://github.com/holgerbrandl) for KScript.
@@ -33,15 +33,27 @@ $ [kscript] deep-clean.kts [options]
 Where the options are:
 
 ```
--d --dry-run  Don't delete anything. Useful for testing. Implies --verbose.
--n --nuke     ⚠️  THIS IS DANGEROUS SHIT ⚠️  Super-deep clean
-              This includes clearing out global folders, including:
-               * the global Gradle cache
-               * the wrapper-downloaded Gradle distros
-               * the Gradle daemon data (logs, locks, etc.)
-               * the Android build cache
-              Nukes the entire thing from orbit — it's the only way to be sure.
--v --verbose  Print detailed information about all commands.
+-d --dry-run     Don't delete anything. Useful for testing. Implies --verbose.
+-b --backup      Renames files and folders instead of deleting them. Implies
+                 --verbose.
+-i --ide         This also deletes IDEA/Android Studio project files (*.iml).
+                 If used in conjunction with --nuke it will also delete the
+                 .idea folder in the current directory.
+-n --nuke        ⚠️  THIS IS DANGEROUS SHIT ⚠️  Super-deep clean
+                 This includes clearing out global folders, including:
+                  * the global Gradle cache
+                  * the wrapper-downloaded Gradle distros
+                  * the Gradle daemon data (logs, locks, etc.)
+                  * the Android build cache
+                 Nukes the entire thing from orbit — it's the only way to be sure.
+--not-recursive  Don't recursively search sub-folders of this folder for matches.
+                 The default behaviour is to look for matches in sub-directories,
+                 since things like 'build' folders and '.iml' files are not all
+                 found at the top level of a project directory structure. This
+                 flag is useful if you know you have matches you want to keep,
+                 e.g., if your code contains a package with a name like 'build'.
+                 This option severely limits the effectiveness of the deep clean.
+-v --verbose     Print detailed information about all commands.
 ```
 
 If you **DON'T have all three commands** on your `PATH`, then read on to the next
