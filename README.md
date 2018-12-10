@@ -10,6 +10,8 @@ Useful when Gradle or the IDE let you down 💔
 The script has been tested on macOS 🍎, but it is completely untested on
 Linux 🐧 and Windows 🖥️.
 
+⚠️There may be [major issues](https://github.com/rock3r/deep-clean/issues/4) on Windows/Linux when using `-n`, please let me know if you encounter any such issue!
+
 **USE AT YOUR OWN RISK IN ANY CASE!**
 
 ## Running the script
@@ -23,6 +25,7 @@ If you **have all three commands** on your `PATH`, then you can simply download
 and execute the script:
 
 ```bash
+$ cd /your/project/root.folder
 $ [kscript] deep-clean.kts [options]
 ```
 
@@ -33,27 +36,31 @@ $ [kscript] deep-clean.kts [options]
 Where the options are:
 
 ```
--d --dry-run     Don't delete anything. Useful for testing. Implies --verbose.
--b --backup      Renames files and folders instead of deleting them. Implies
-                 --verbose.
--i --ide         This also deletes IDEA/Android Studio project files (*.iml).
-                 If used in conjunction with --nuke it will also delete the
-                 .idea folder in the current directory.
--n --nuke        ⚠️  THIS IS DANGEROUS SHIT ⚠️  Super-deep clean
-                 This includes clearing out global folders, including:
-                  * the global Gradle cache
-                  * the wrapper-downloaded Gradle distros
-                  * the Gradle daemon data (logs, locks, etc.)
-                  * the Android build cache
-                 Nukes the entire thing from orbit — it's the only way to be sure.
---not-recursive  Don't recursively search sub-folders of this folder for matches.
-                 The default behaviour is to look for matches in sub-directories,
-                 since things like 'build' folders and '.iml' files are not all
-                 found at the top level of a project directory structure. This
-                 flag is useful if you know you have matches you want to keep,
-                 e.g., if your code contains a package with a name like 'build'.
-                 This option severely limits the effectiveness of the deep clean.
--v --verbose     Print detailed information about all commands.
+-b --backup           Renames files and folders instead of deleting them. Implies
+                      --verbose.
+-d --dry-run          Don't delete anything. Useful for testing. Implies --verbose.
+-i --ide-files        This also deletes IDEA/Android Studio project files (*.iml).
+                      If used in conjunction with --nuke it will also delete the
+                      .idea folder in the current directory.
+-p --ide-preferences  ⚠️  THIS IS DANGEROUS SHIT ⚠️  Will wipe your IDE settings!
+                      This deletes the GLOBAL IDEA/Android Studio preferences.
+                      This option requires the --nuke option to be active too, since
+                      it touches global system state.
+--not-recursive       Don't recursively search sub-folders of this folder for matches.
+                      The default behaviour is to look for matches in sub-directories,
+                      since things like 'build' folders and '.iml' files are not all
+                      found at the top level of a project directory structure. This
+                      flag is useful if you know you have matches you want to keep,
+                      e.g., if your code contains a package with a name like 'build'.
+                      This option severely limits the effectiveness of the deep clean.
+-n --nuke             ⚠️  THIS IS DANGEROUS SHIT ⚠️  Super-deep clean
+                      This includes clearing out global folders, including:
+                       * the global Gradle cache
+                       * the wrapper-downloaded Gradle distros
+                       * the Gradle daemon data (logs, locks, etc.)
+                       * the Android build cache
+                      Nukes the entire thing from orbit — it's the only way to be sure.
+-v --verbose          Print detailed information about all commands.
 ```
 
 If you **DON'T have all three commands** on your `PATH`, then read on to the next
