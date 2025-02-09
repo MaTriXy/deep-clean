@@ -2,11 +2,12 @@
 
 @file:DependsOn("com.offbytwo:docopt:0.6.0.20150202")
 
-import Deep_clean.CommandLineArguments
 import org.docopt.Docopt
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import kotlin.system.exitProcess
 
 typealias CommandLineArguments = Map<String, Any>
 
@@ -37,6 +38,7 @@ Options:
     -n --nuke             ⚠️  THIS IS DANGEROUS SHIT ⚠️  Super-deep clean
                           This includes clearing out global folders, including:
                            * the global Gradle cache
+                           * the global Maven artefacts
                            * the wrapper-downloaded Gradle distros
                            * the Gradle daemon data (logs, locks, etc.)
                            * the Android build cache
@@ -46,13 +48,14 @@ Options:
 
 val userHome = File(System.getProperty("user.home"))
 val gradleHome = locateGradleHome()
+val mavenLocalRepository = locateMavenLocalRepository()
 
 val workingDir = File(Paths.get("").toAbsolutePath().toString())
 
 assert(userHome.exists()) { "Unable to determine the user home folder, aborting..." }
 
 val parsedArgs: CommandLineArguments = Docopt(usage)
-    .withVersion("deep-clean 1.4.0")
+    .withVersion("deep-clean 1.5.0")
     .parse(args.toList())
 
 val nukeItFromOrbit = parsedArgs.isFlagSet("--nuke", "-n")
@@ -66,7 +69,6 @@ val verbose = backup || dryRun || parsedArgs.isFlagSet("--verbose", "-v")
 
 if (shouldAlsoClearIdePreferences != idePreferences) {
     println("\n⚠️  To clear the IDE preferences you must also enable nuke mode.")
-    System.exit(1)
 }
 
 if (dryRun) println("\nℹ️  This is a dry-run. No files will be moved/deleted.\n")
@@ -74,21 +76,28 @@ if (dryRun) println("\nℹ️  This is a dry-run. No files will be moved/deleted
 val wetRun = dryRun.not()
 val gradlew = "./gradlew" + if (isOsWindows()) ".bat" else ""
 
+if (!File(gradlew.removePrefix("./")).exists()) {
+    printInBold("❌  Could not find Gradle wrapper in the work directory: $gradlew")
+    exitProcess(-1)
+}
+
 Runtime.getRuntime().apply {
     printInBold("⏳ Executing Gradle clean...")
-    execOnWetRun("$gradlew clean -q")
-        ?.printOutput(onlyErrors = !verbose)
+    doWithGradleWrapper {
+        execOnWetRun("$gradlew clean -q")
+            ?.printOutput(onlyErrors = !verbose)
+    }
     println()
 
     printInBold("🔫 Killing Gradle daemon...")
-    execOnWetRun("$gradlew --stop")
-        ?.printOutput()
+    doWithGradleWrapper {
+        execOnWetRun("$gradlew --stop")
+            ?.printOutput()
+    }
     println()
 
     printInBold("🔫 Killing ADB server...")
-    execOnWetRun("adb kill-server")
-        ?.printIfNoError("Adb server killed.")
-    execOnWetRun("killall adb")
+    killAdb()
     println()
 
     printInBold("🔥 Removing every 'build' folder...")
@@ -137,6 +146,10 @@ fun locateGradleHome(): File? {
     }
 }
 
+fun locateMavenLocalRepository(): File? {
+    return File(userHome, ".m2").takeIf { it.exists() }
+}
+
 fun CommandLineArguments.isFlagSet(vararg flagAliases: String): Boolean =
     flagAliases.map { this[it] as Boolean? }
         .first { it != null }!!
@@ -155,6 +168,31 @@ fun Process.printIfNoError(message: String) {
         println("     $message")
     }
 }
+
+fun Runtime.doWithGradleWrapper(action: () -> Unit) {
+    if (!Files.exists(Paths.get("gradlew")) && !isExecutableOnPath("adb")) {
+        println("⚠️  Gradle wrapper not found. Nothing to do here.")
+        return
+    }
+
+    action()
+}
+
+fun Runtime.killAdb() {
+    if (!isExecutableOnPath("adb")) {
+        println("⚠️  ADB not found. Nothing to do here.")
+        return
+    }
+
+    execOnWetRun("adb kill-server")
+        ?.printIfNoError("Adb server killed.")
+    execOnWetRun("killall adb")
+}
+
+fun Runtime.isExecutableOnPath(executableName: String) =
+    System.getenv("PATH").split(File.pathSeparator)
+        .map(Paths::get)
+        .any { pathEntry -> Files.exists(pathEntry.resolve(executableName)) }
 
 fun deleteIdeaProjectFiles() {
     printInBold("🔥 Removing IntelliJ IDEA/Android Studio '.iml' project files...")
@@ -292,14 +330,22 @@ fun Runtime.nukeGlobalCaches() {
     clearIdeCache(Ide.AndroidStudio)
     println()
 
+    printInBold("🔥 Clearing Maven local repository artefacts...")
+    if (mavenLocalRepository != null) {
+        if (verbose) println("     ℹ️  Maven local repository found at: ${mavenLocalRepository.absolutePath}")
+        mavenLocalRepository.removeSubfoldersMatching { it.name.toLowerCase() == "repository" }
+    } else {
+        println("     ⚠️  Unable to locate Maven local repository. Checked ~/.m2")
+    }
+
     printInBold("🔥 Clearing Gradle global cache directories: build-scan-data, caches, daemon, wrapper...")
     if (gradleHome != null) {
         if (verbose) println("     ℹ️  Gradle home found at: ${gradleHome.absolutePath}")
         gradleHome.removeSubfoldersMatching {
             it.name.toLowerCase() == "build-scan-data" ||
-                it.name.toLowerCase() == "caches" ||
-                it.name.toLowerCase() == "daemon" ||
-                it.name.toLowerCase() == "wrapper"
+                    it.name.toLowerCase() == "caches" ||
+                    it.name.toLowerCase() == "daemon" ||
+                    it.name.toLowerCase() == "wrapper"
         }
     } else {
         println("     ⚠️  Unable to locate Gradle home directory. Checked \$GRADLE_HOME and ~/.gradle")
@@ -376,7 +422,7 @@ fun File.removeSubfoldersMatching(matcher: (file: File) -> Boolean) {
 }
 
 fun File.listContents(recursively: Boolean, matcher: (File) -> Boolean): Sequence<File> =
-    this.listFiles()
+    listFiles()!!
         .asSequence()
         .flatMap {
             when {
